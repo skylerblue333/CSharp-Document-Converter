@@ -1,69 +1,29 @@
-using System;
-using System.IO;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using System.Text.Json;
 using System.Text;
 
-namespace DocumentConverter
-{
-    public enum DocumentFormat { Markdown, HTML, PlainText }
+var builder = WebApplication.CreateBuilder(args);
+var app = builder.Build();
 
-    public class Converter
-    {
-        public string Convert(string input, DocumentFormat from, DocumentFormat to)
-        {
-            if (from == to) return input;
+app.MapPost("/api/v1/convert", async (HttpContext context) => {
+    using var doc = await JsonDocument.ParseAsync(context.Request.Body);
+    var root = doc.RootElement;
+    
+    var content = root.TryGetProperty("content", out var c) ? c.GetString() ?? "" : "";
+    var fromFormat = root.TryGetProperty("from", out var f) ? f.GetString() ?? "text" : "text";
+    var toFormat = root.TryGetProperty("to", out var t) ? t.GetString() ?? "json" : "json";
+    
+    object converted = toFormat switch {
+        "json" => new { content, format = "json", length = content.Length },
+        "base64" => new { content = Convert.ToBase64String(Encoding.UTF8.GetBytes(content)), format = "base64" },
+        "upper" => new { content = content.ToUpper(), format = "upper" },
+        _ => new { content, format = fromFormat }
+    };
+    
+    await context.Response.WriteAsJsonAsync(converted);
+});
 
-            string plainText = from switch
-            {
-                DocumentFormat.Markdown  => StripMarkdown(input),
-                DocumentFormat.HTML      => StripHtml(input),
-                DocumentFormat.PlainText => input,
-                _ => throw new NotSupportedException()
-            };
+app.MapGet("/health", () => new { status = "healthy", version = "3.0.0" });
 
-            return to switch
-            {
-                DocumentFormat.HTML      => ToHtml(plainText),
-                DocumentFormat.Markdown  => $"# {plainText.Split('\n')[0]}\n\n{plainText}",
-                DocumentFormat.PlainText => plainText,
-                _ => throw new NotSupportedException()
-            };
-        }
-
-        private string StripMarkdown(string md) =>
-            md.Replace("#", "").Replace("**", "").Replace("*", "").Trim();
-
-        private string StripHtml(string html) =>
-            System.Text.RegularExpressions.Regex.Replace(html, "<[^>]+>", "").Trim();
-
-        private string ToHtml(string text)
-        {
-            var sb = new StringBuilder();
-            sb.AppendLine("<!DOCTYPE html><html><body>");
-            foreach (var line in text.Split('\n'))
-                sb.AppendLine($"<p>{line}</p>");
-            sb.AppendLine("</body></html>");
-            return sb.ToString();
-        }
-    }
-
-    class Program
-    {
-        static void Main()
-        {
-            var converter = new Converter();
-            string md = "# Hello World\n\nThis is a **bold** statement.";
-
-            Console.WriteLine("=== Document Converter ===\n");
-            Console.WriteLine("[INPUT - Markdown]");
-            Console.WriteLine(md);
-
-            string html = converter.Convert(md, DocumentFormat.Markdown, DocumentFormat.HTML);
-            Console.WriteLine("\n[OUTPUT - HTML]");
-            Console.WriteLine(html);
-
-            string plain = converter.Convert(md, DocumentFormat.Markdown, DocumentFormat.PlainText);
-            Console.WriteLine("[OUTPUT - PlainText]");
-            Console.WriteLine(plain);
-        }
-    }
-}
+app.Run("http://0.0.0.0:8080");
