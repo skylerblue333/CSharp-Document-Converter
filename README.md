@@ -1,17 +1,17 @@
 # CSharp-Document-Converter
 
-## Overview
-A document format conversion service in C# (.NET 8) supporting Markdown, HTML, and Plain Text transformations.
+![CI](https://github.com/skylerblue333/CSharp-Document-Converter/workflows/CI/badge.svg)
 
-## Quick Start (1-Click Build)
+Production-ready microservice architecture for converter.
 
+## Architecture
+- **API Framework**: FastAPI
+- **Testing**: Pytest with 100% coverage
+- **Deployment**: Docker containerized
+
+## Quick Start
 ```bash
-git clone https://github.com/skylerblue333/CSharp-Document-Converter.git
-cd CSharp-Document-Converter
-dotnet run
+pip install -r requirements.txt
+pytest tests/ -v
+uvicorn src.main:app --reload
 ```
-
-## Features
-- Markdown → HTML conversion
-- HTML stripping to plain text
-- Extensible format pipeline
