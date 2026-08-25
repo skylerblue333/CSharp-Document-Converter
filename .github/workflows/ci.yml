@@ -25,7 +25,7 @@ jobs:
         run: |
           output="$(dotnet list CSharp-Document-Converter.csproj package --vulnerable --include-transitive)"
           echo "$output"
-          if echo "$output" | grep -Eiq 'has the following vulnerable packages|Critical|High|Moderate|Low'; then exit 1; fi
+          if echo "$output" | grep -Fqi 'has the following vulnerable packages'; then exit 1; fi
       - name: Build image
         run: docker build -t sky-text-transform:ci .
       - name: Verify non-root image
