@@ -13,9 +13,11 @@ public static class TextTransforms
         {
             throw new ArgumentException("content is required");
         }
-        if (content.Length > MaxInputCharacters)
+
+        var inputCharacters = content.EnumerateRunes().Count();
+        if (inputCharacters > MaxInputCharacters)
         {
-            throw new ArgumentException($"content exceeds {MaxInputCharacters} characters");
+            throw new ArgumentException($"content exceeds {MaxInputCharacters} Unicode scalar values");
         }
 
         output = output?.Trim().ToLowerInvariant();
@@ -29,31 +31,31 @@ public static class TextTransforms
             "metadata" => new TransformResult(
                 Content: content,
                 Format: "metadata",
-                InputCharacters: content.Length,
+                InputCharacters: inputCharacters,
                 OutputBytes: Encoding.UTF8.GetByteCount(content)),
-            "base64" => BuildBase64(content),
-            "upper" => BuildUpper(content),
+            "base64" => BuildBase64(content, inputCharacters),
+            "upper" => BuildUpper(content, inputCharacters),
             _ => throw new InvalidOperationException("validated output was not handled")
         };
     }
 
-    private static TransformResult BuildBase64(string content)
+    private static TransformResult BuildBase64(string content, int inputCharacters)
     {
         var encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes(content));
         return new TransformResult(
             Content: encoded,
             Format: "base64",
-            InputCharacters: content.Length,
+            InputCharacters: inputCharacters,
             OutputBytes: Encoding.UTF8.GetByteCount(encoded));
     }
 
-    private static TransformResult BuildUpper(string content)
+    private static TransformResult BuildUpper(string content, int inputCharacters)
     {
         var upper = content.ToUpperInvariant();
         return new TransformResult(
             Content: upper,
             Format: "upper",
-            InputCharacters: content.Length,
+            InputCharacters: inputCharacters,
             OutputBytes: Encoding.UTF8.GetByteCount(upper));
     }
 }
