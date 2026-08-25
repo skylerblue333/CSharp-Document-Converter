@@ -1,29 +1,35 @@
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http;
-using System.Text.Json;
-using System.Text;
+using SkyDocumentConverter;
 
 var builder = WebApplication.CreateBuilder(args);
 var app = builder.Build();
 
-app.MapPost("/api/v1/convert", async (HttpContext context) => {
-    using var doc = await JsonDocument.ParseAsync(context.Request.Body);
-    var root = doc.RootElement;
-    
-    var content = root.TryGetProperty("content", out var c) ? c.GetString() ?? "" : "";
-    var fromFormat = root.TryGetProperty("from", out var f) ? f.GetString() ?? "text" : "text";
-    var toFormat = root.TryGetProperty("to", out var t) ? t.GetString() ?? "json" : "json";
-    
-    object converted = toFormat switch {
-        "json" => new { content, format = "json", length = content.Length },
-        "base64" => new { content = Convert.ToBase64String(Encoding.UTF8.GetBytes(content)), format = "base64" },
-        "upper" => new { content = content.ToUpper(), format = "upper" },
-        _ => new { content, format = fromFormat }
-    };
-    
-    await context.Response.WriteAsJsonAsync(converted);
+app.MapGet("/healthz", () => Results.Ok(new { status = "ok", service = "sky-text-transform" }));
+app.MapGet("/readyz", () => Results.Ok(new
+{
+    status = "ready",
+    maxInputCharacters = TextTransforms.MaxInputCharacters,
+    supportedInput = "text",
+    supportedOutputs = TextTransforms.SupportedOutputs
+}));
+
+app.MapPost("/v1/convert", (ConvertRequest request) =>
+{
+    try
+    {
+        if (!string.Equals(request.From, "text", StringComparison.OrdinalIgnoreCase))
+        {
+            return Results.UnprocessableEntity(new { error = "only 'text' input is supported" });
+        }
+
+        var result = TextTransforms.Transform(request.Content, request.To);
+        return Results.Ok(result);
+    }
+    catch (ArgumentException exception)
+    {
+        return Results.UnprocessableEntity(new { error = exception.Message });
+    }
 });
 
-app.MapGet("/health", () => new { status = "healthy", version = "3.0.0" });
+app.Run();
 
-app.Run("http://0.0.0.0:8080");
+public sealed record ConvertRequest(string? Content, string? From, string? To);

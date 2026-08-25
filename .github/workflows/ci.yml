@@ -1,11 +1,41 @@
-name: CI
-on: [push, pull_request]
+name: text-transform-ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
 jobs:
-  build:
+  verify:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-dotnet@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-      - run: dotnet build
+      - name: Restore
+        run: dotnet restore CSharp-Document-Converter.csproj
+      - name: Release build
+        run: dotnet build CSharp-Document-Converter.csproj -c Release --no-restore
+      - name: Core tests
+        run: dotnet run --project tests/ConverterTests.csproj -c Release
+      - name: Vulnerable dependency check
+        run: |
+          output="$(dotnet list CSharp-Document-Converter.csproj package --vulnerable --include-transitive)"
+          echo "$output"
+          if echo "$output" | grep -Fqi 'has the following vulnerable packages'; then exit 1; fi
+      - name: Build image
+        run: docker build -t sky-text-transform:ci .
+      - name: Verify non-root image
+        run: test "$(docker run --rm --entrypoint=id sky-text-transform:ci -u)" != "0"
+      - name: Smoke health
+        run: |
+          docker run -d --rm --name sky-text-transform-ci -p 18004:8080 sky-text-transform:ci
+          for i in $(seq 1 20); do
+            if curl --fail --silent http://127.0.0.1:18004/healthz >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          docker logs sky-text-transform-ci
+          exit 1
