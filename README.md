@@ -1,44 +1,68 @@
-<!-- PORTFOLIO PROJECT PROFILE: maintained by the repository owner -->
+# Sky Text Transform — C# Engineering Beta
 
-## Project profile and code-audit snapshot
+Sky Text Transform is a focused ASP.NET Core service for deterministic transformations of bounded plain-text input. It deliberately replaces the broader “document converter” claim with the behaviors this repository actually implements and verifies.
 
-**What this is:** **CSharp-Document-Converter** is a public repository described as: “Document format conversion service in C# supporting PDF and HTML. #SkyCoin4444 #AI #Blockchain #DevOps #Innovation” Its dominant language signals are **C# (1 files)**.
+## Status
 
-**Why it has value:** Its value is best understood through the implementation evidence currently present in the repository: **15 tracked files** were observed in the shallow audit, with the source structure and existing documentation providing the project’s specific context. This README does not treat a prototype, experiment, or archive as a production system without supporting evidence.
+**Engineering beta.** The service accepts text input up to 100,000 characters and supports exactly three outputs: `metadata`, `base64`, and `upper`. It validates unsupported input/output formats, exposes health/readiness endpoints, has dependency-free executable core tests, strict Release compilation, vulnerable-package inspection, and non-root container verification.
 
-**Implementation evidence:** No test-related file was detected by filename heuristics.; 2 dependency or package manifest(s) detected; 2 build/CI/infrastructure signal(s) detected; and 3 documentation or governance file(s) detected. Test filenames observed include none detected. Dependency or package files include `CSharp-Document-Converter.csproj`, `package.json`. Build, CI, or infrastructure signals include `Dockerfile`, `.github/workflows/ci.yml`.
+It does **not** claim PDF or Office conversion, HTML rendering, OCR, file upload parsing, document storage, malware scanning, rich-format fidelity, HA, or production deployment.
 
-**Current status:** The repository is tracked on the `main` branch. The existing source tree, configuration, tests, workflows, and documentation remain authoritative for supported behavior and maturity. A code audit is not a production-readiness certification, and the presence of a test or workflow file does not establish that all checks pass.
+## API
 
-**Relationship to the wider portfolio:** This repository is one focused component of the broader Skyler Blue Spillers portfolio across AI, software engineering, cloud and DevOps, cybersecurity, blockchain, finance, education, social systems, and creative work. It may provide a service boundary, implementation pattern, experiment, archive, or reusable idea for related repositories. Treat repositories as technical dependencies only where documented interfaces and verified project requirements support that relationship.
+- `GET /healthz` — process liveness.
+- `GET /readyz` — current size and format contract.
+- `POST /v1/convert` — transform text.
 
-**Quality and security note:** No obvious secret-like pattern was detected by the limited static scan; this is not a substitute for a security audit. No TODO/FIXME marker was detected in the scanned text files.
+Example:
 
----
+```json
+{
+  "content": "Hello Sky",
+  "from": "text",
+  "to": "base64"
+}
+```
 
-# Csharp Document Converter
+Supported `to` values:
 
-![GitHub stars](https://img.shields.io/github/stars/skylerblue333/CSharp-Document-Converter?style=flat-square)
-![GitHub license](https://img.shields.io/github/license/skylerblue333/CSharp-Document-Converter?style=flat-square)
+- `metadata` — preserve content and report character/UTF-8 byte counts.
+- `base64` — UTF-8 encode and return Base64 text.
+- `upper` — invariant uppercase transformation.
 
-## 🌟 Overview
-**CSharp-Document-Converter** is a professional-grade project within the **SkyCoin4444** ecosystem. It focuses on delivering high-value solutions in the domain of **Software Development**.
+Unsupported `from`/`to` values return HTTP 422 instead of silently pretending a conversion succeeded.
 
-## 🚀 Key Features
-- **Scalable Architecture**: Designed for enterprise-level growth and performance.
-- **Modern Standards**: Implements best practices for clean code and maintainability.
-- **Robust Integration**: Built to work seamlessly within modern cloud-native environments.
+## Run locally
 
-## 🛠️ Technology Stack
-- **Primary Domain**: Software Development
-- **Ecosystem**: SkyCoin4444 Digital Platform
+```bash
+dotnet restore CSharp-Document-Converter.csproj
+dotnet run --project CSharp-Document-Converter.csproj
+```
 
-## 📂 Structure
-The project is organized into a modular structure to ensure clarity and ease of development.
+## Verify
 
-## 👨‍💻 Author
-**Skyler Blue Spillers**
-*Professional Chess Player & Software Engineer*
+```bash
+dotnet build CSharp-Document-Converter.csproj -c Release
+dotnet run --project tests/ConverterTests.csproj -c Release
+dotnet list CSharp-Document-Converter.csproj package --vulnerable --include-transitive
+docker build -t sky-text-transform .
+docker run --rm --entrypoint=id sky-text-transform -u
+```
 
----
-*Powered by SkyCoin4444*
+The runtime image uses the non-root `app` user from the .NET 8 image. CI also starts the image and verifies `/healthz`.
+
+## Architecture
+
+`TextTransforms.cs` contains the reusable deterministic transformation core. `Program.cs` exposes that core through a small ASP.NET Core HTTP boundary. The service keeps content process-local and does not persist documents.
+
+## SKYCOIN4444 integration
+
+SKYCOIN4444 services can use this component for small deterministic text normalization/encoding tasks through a stable HTTP boundary instead of embedding duplicate transformation logic. Rich document conversion should use a separate purpose-built service whose supported formats and security model are independently verified.
+
+## Security and operational boundaries
+
+The service does not authenticate callers, scan content for malware/secrets, provide tenant isolation, encrypt stored documents, or retain conversion history. Input is treated as text only and is bounded by character count. Put appropriate gateway/access controls in front of it before use outside a trusted development environment.
+
+## License
+
+See `LICENSE`.
